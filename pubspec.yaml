@@ -10,6 +10,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  agent_dart: ^1.0.0-dev.22
+  fluttertoast: ^8.2.4
+  uni_links: ^0.5.1
+  flutter_custom_tabs: ^1.2.1
 
 dev_dependencies:
   flutter_test:
