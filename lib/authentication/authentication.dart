@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'package:flutter/material.dart';
-import 'package:uni_links/uni_links.dart';
 import 'package:agent_dart/agent_dart.dart';
 import 'package:flutter_custom_tabs/flutter_custom_tabs.dart';
 
@@ -11,6 +10,10 @@ class IIDLogin extends StatefulWidget {
     super.key,
     required this.isComplete,
     required this.text,
+    required this.scheme,
+    required this.host,
+    this.onPrincipalIdReceived,
+    this.onError,
     this.borderRadius = const BorderRadius.all(Radius.circular(8)),
     this.gradient = const LinearGradient(
       colors: [Color(0xFF522785), Color(0xFFED1E79)],
@@ -26,6 +29,10 @@ class IIDLogin extends StatefulWidget {
   final BorderRadius borderRadius;
   final Gradient gradient;
   final TextStyle textStyle;
+  final String scheme;
+  final String host;
+  final Function(String)? onPrincipalIdReceived;
+  final Function(String)? onError;
 
   @override
   IIDLoginState createState() => IIDLoginState();
@@ -33,67 +40,35 @@ class IIDLogin extends StatefulWidget {
 
 class IIDLoginState extends State<IIDLogin> {
   CanisterActor? newActor;
-  StreamSubscription? _sub;
-  Ed25519KeyIdentity? newIdentity;
+  static Ed25519KeyIdentity? newIdentity;
   String? publicKeyString;
-  String? principalId;
+  static String? principalId;
   String? _error;
 
-  @override
-  void initState() {
-    super.initState();
-    initUniLinks();
-  }
+  static get getPrincipal => principalId;
 
-  @override
-  void dispose() {
-    _sub?.cancel();
-    super.dispose();
-  }
+  static List<Object> fetchAgent(Map<String, String> queryParams) {
+    String delegationString = queryParams['del'].toString();
+    String decodedDelegation = Uri.decodeComponent(delegationString);
+    DelegationChain delegationChain =
+        DelegationChain.fromJSON(jsonDecode(decodedDelegation));
+    DelegationIdentity delegationIdentity =
+        DelegationIdentity(newIdentity!, delegationChain);
 
-  Future<void> initUniLinks() async {
-    _sub = uriLinkStream.listen((Uri? uri) async {
-      if (uri != null && uri.scheme == 'auth' && uri.host == 'callback') {
-        var queryParams = uri.queryParameters;
+    principalId = delegationIdentity.getPrincipal().toText();
 
-        String delegationString = queryParams['del'].toString();
-
-        String decodedDelegation = Uri.decodeComponent(delegationString);
-
-        DelegationChain delegationChain =
-            DelegationChain.fromJSON(jsonDecode(decodedDelegation));
-
-        DelegationIdentity delegationIdentity =
-            DelegationIdentity(newIdentity!, delegationChain);
-
-        principalId = delegationIdentity.getPrincipal().toHex();
-
-        HttpAgent newAgent = HttpAgent(
-          options: HttpAgentOptions(
-            identity: delegationIdentity,
-            // ---- Uncomment the following line to use main-net replica ----
-            host: 'icp-api.io',
-          ),
-          // ---- Uncomment the following 3 lines to use a local replica ----
-          // defaultHost: 'localhost',
-          // defaultPort: 4943,
-          // defaultProtocol: 'http',
-        );
-
-        log('Agent: $newAgent');
-
-        // Creating Canister Actor -----------------------
-        // newActor = CanisterActor(
-        //     ActorConfig(
-        //       // ---- Main-net replica ----
-        //       canisterId: Principal.fromText('c7oiy-yqaaa-aaaag-qc6sa-cai'),
-        //       // ---- Local replica ----
-        //       // canisterId: Principal.fromText('bw4dl-smaaa-aaaaa-qaacq-cai'),
-        //       agent: newAgent,
-        //     ),
-        //     FieldsMethod.idl);
-      }
-    });
+    HttpAgent newAgent = HttpAgent(
+      options: HttpAgentOptions(
+        identity: delegationIdentity,
+        // ---- Uncomment the following line to use main-net replica ----
+        host: 'icp-api.io',
+      ),
+      // ---- Uncomment the following 3 lines to use a local replica ----
+      // defaultHost: 'localhost',
+      // defaultPort: 4943,
+      // defaultProtocol: 'http',
+    );
+    return [newAgent, delegationIdentity];
   }
 
 // ---------------- Authentication ----------------
@@ -104,12 +79,12 @@ class IIDLoginState extends State<IIDLogin> {
       var publicKeyDer = publicKey.toDer();
       publicKeyString = bytesToHex(publicKeyDer);
       // ---- Local replica ----
-      // const baseUrl = 'http://localhost:4943';
-      // final url =
-      //     '$baseUrl?sessionkey=$publicKeyString&canisterId=asrmz-lmaaa-aaaaa-qaaeq-cai';
+      const baseUrl = 'http://localhost:4943';
+      final url =
+          '$baseUrl?sessionkey=$publicKeyString&canisterId=bkyz2-fmaaa-aaaaa-qaaaq-cai&host=${widget.host}&scheme=${widget.scheme}';
       // ---- Main-net replica ----
-      const baseUrl = 'https://ckjzv-zyaaa-aaaag-qc6rq-cai.icp0.io';
-      final url = '$baseUrl?sessionkey=$publicKeyString';
+      // const baseUrl = 'https://ckjzv-zyaaa-aaaag-qc6rq-cai.icp0.io';
+      // final url = '$baseUrl?sessionkey=$publicKeyString&host=${widget.host}&scheme=${widget.scheme}';
       await launch(
         url,
         customTabsOption: const CustomTabsOption(
@@ -148,7 +123,7 @@ class IIDLoginState extends State<IIDLogin> {
             borderRadius: widget.borderRadius,
           ),
           padding: const EdgeInsets.all(16),
-        ), // Change here: Use the function reference
+        ),
         child: Text(
           widget.text,
           style: widget.textStyle,
