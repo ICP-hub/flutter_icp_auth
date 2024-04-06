@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:agent_dart/agent_dart.dart';
-import '../internal/_secure_store.dart';
 import 'package:flutter_custom_tabs/flutter_custom_tabs.dart';
+
+import '../internal/_secure_store.dart';
 
 class IIDLogin extends StatefulWidget {
   const IIDLogin({
@@ -71,8 +73,8 @@ class IIDLoginState extends State<IIDLogin> {
     SecureStore.writeSecureData("delegation", delegationString);
 
     _principalId = delegationIdentity.getPrincipal().toText();
-    HttpAgent newAgent;
 
+    HttpAgent newAgent;
     if (local) {
       newAgent = HttpAgent(
         options: HttpAgentOptions(
@@ -90,6 +92,7 @@ class IIDLoginState extends State<IIDLogin> {
         ),
       );
     }
+
     return [newAgent, delegationIdentity];
   }
 

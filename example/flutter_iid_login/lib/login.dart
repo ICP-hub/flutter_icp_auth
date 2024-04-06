@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:uni_links/uni_links.dart';
+import 'package:agent_dart/agent_dart.dart';
 import 'package:flutter_icp_auth/flutter_icp_auth.dart';
+
+import 'services/integration.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
@@ -15,8 +19,8 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   StreamSubscription? _sub;
-  final String _linkMessage = "Your principal id will appear here";
   late List<Object> delegationObject;
+  String _principalId = "Your principal id will appear here";
 
   @override
   void initState() {
@@ -30,6 +34,10 @@ class _MyHomePageState extends State<MyHomePage> {
     super.dispose();
   }
 
+  // Initial state of the application
+  // Receives the delegation string from the middle page
+  // Sends param to the flutter_icp_auth package to get the Agent and the delegationIdentity
+  // Runs whoAmI() to demonstrate actor creation and making API calls
   Future<void> _initUniLinks() async {
     try {
       final initialLink = await getInitialUri();
@@ -37,6 +45,7 @@ class _MyHomePageState extends State<MyHomePage> {
         delegationObject =
             await IIDLoginState.fetchAgent(initialLink.queryParameters, true);
         log("Delegation Object: $delegationObject");
+        whoAmI();
       }
     } catch (e) {
       log("Error: $e");
@@ -44,11 +53,35 @@ class _MyHomePageState extends State<MyHomePage> {
 
     _sub = uriLinkStream.listen((Uri? uri) async {
       if (uri != null) {
-        delegationObject = await IIDLoginState.fetchAgent(uri.queryParameters, true);
+        delegationObject =
+            await IIDLoginState.fetchAgent(uri.queryParameters, true);
         log("Delegation Object: $delegationObject");
+        whoAmI();
       }
     }, onError: (err) {
       log("Error: $err");
+    });
+  }
+
+  // Extracts the HttpAgent from the delegation object received
+  // Creates a new CanisterActor using the new Agent
+  // Calling whoAmI() function to confirm user login and get user principalId
+  Future<void> whoAmI() async {
+    HttpAgent? extractedAgent =
+        delegationObject.whereType<HttpAgent>().firstOrNull;
+
+    CanisterActor newActor = CanisterActor(
+        ActorConfig(
+          canisterId: Principal.fromText('asrmz-lmaaa-aaaaa-qaaeq-cai'),
+          agent: extractedAgent!,
+        ),
+        FieldsMethod.idl);
+
+    var myPrincipal = await newActor.getFunc(FieldsMethod.whoAmI)?.call([]);
+    log("My principal: $myPrincipal");
+
+    setState(() {
+      _principalId = myPrincipal;
     });
   }
 
@@ -79,7 +112,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ),
               Text(
-                _linkMessage,
+                _principalId,
                 style: const TextStyle(
                   fontSize: 12,
                 ),

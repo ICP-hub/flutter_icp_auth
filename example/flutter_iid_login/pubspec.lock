@@ -2,7 +2,7 @@
 # See https://dart.dev/tools/pub/glossary#lockfile
 packages:
   agent_dart:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: agent_dart
       sha256: "7d44a06a64e4d8ce9331b45dae28315de0f7e17db6f4bf306d6a2579b38ce7f3"
