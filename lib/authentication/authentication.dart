@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:agent_dart/agent_dart.dart';
+import '../internal/_secure_store.dart';
 import 'package:flutter_custom_tabs/flutter_custom_tabs.dart';
 
 class IIDLogin extends StatefulWidget {
@@ -40,42 +41,65 @@ class IIDLogin extends StatefulWidget {
 
 class IIDLoginState extends State<IIDLogin> {
   CanisterActor? newActor;
-  static Ed25519KeyIdentity? newIdentity;
+  static Ed25519KeyIdentity? _newIdentity;
   String? publicKeyString;
-  static String? principalId;
+  static String? _principalId;
   String? _error;
 
-  static get getPrincipal => principalId;
+  // --------------------------------------------------
+  // Get principal ID
+  // --------------------------------------------------
+  static get getPrincipal => _principalId;
 
-  static List<Object> fetchAgent(Map<String, String> queryParams) {
+  // --------------------------------------------------
+  // Create Agent function
+  // --------------------------------------------------
+  static Future<List<Object>> fetchAgent(
+      Map<String, String> queryParams, bool local) async {
     String delegationString = queryParams['del'].toString();
     String decodedDelegation = Uri.decodeComponent(delegationString);
     DelegationChain delegationChain =
         DelegationChain.fromJSON(jsonDecode(decodedDelegation));
     DelegationIdentity delegationIdentity =
-        DelegationIdentity(newIdentity!, delegationChain);
+        DelegationIdentity(_newIdentity!, delegationChain);
 
-    principalId = delegationIdentity.getPrincipal().toText();
+    // Storing keys in local for autoLogin
+    SecureStore.writeSecureData(
+        "pubKey", bytesToHex(_newIdentity!.getKeyPair().publicKey.toDer()));
+    SecureStore.writeSecureData(
+        "identity", bytesToHex(_newIdentity!.getKeyPair().secretKey));
+    SecureStore.writeSecureData("delegation", delegationString);
 
-    HttpAgent newAgent = HttpAgent(
-      options: HttpAgentOptions(
-        identity: delegationIdentity,
-        // ---- Uncomment the following line to use main-net replica ----
-        host: 'icp-api.io',
-      ),
-      // ---- Uncomment the following 3 lines to use a local replica ----
-      // defaultHost: 'localhost',
-      // defaultPort: 4943,
-      // defaultProtocol: 'http',
-    );
+    _principalId = delegationIdentity.getPrincipal().toText();
+    HttpAgent newAgent;
+
+    if (local) {
+      newAgent = HttpAgent(
+        options: HttpAgentOptions(
+          identity: delegationIdentity,
+        ),
+        defaultHost: 'localhost',
+        defaultPort: 4943,
+        defaultProtocol: 'http',
+      );
+    } else {
+      newAgent = HttpAgent(
+        options: HttpAgentOptions(
+          identity: delegationIdentity,
+          host: 'icp-api.io',
+        ),
+      );
+    }
     return [newAgent, delegationIdentity];
   }
 
-// ---------------- Authentication ----------------
+  // --------------------------------------------------
+  // Authentication
+  // --------------------------------------------------
   Future<void> authenticate() async {
     try {
-      newIdentity = await Ed25519KeyIdentity.generate(null);
-      Ed25519PublicKey publicKey = newIdentity!.getPublicKey();
+      _newIdentity = await Ed25519KeyIdentity.generate(null);
+      Ed25519PublicKey publicKey = _newIdentity!.getPublicKey();
       var publicKeyDer = publicKey.toDer();
       publicKeyString = bytesToHex(publicKeyDer);
       // ---- Local replica ----
@@ -85,18 +109,22 @@ class IIDLoginState extends State<IIDLogin> {
       // ---- Main-net replica ----
       // const baseUrl = 'https://ckjzv-zyaaa-aaaag-qc6rq-cai.icp0.io';
       // final url = '$baseUrl?sessionkey=$publicKeyString&host=${widget.host}&scheme=${widget.scheme}';
-      await launch(
-        url,
-        customTabsOption: const CustomTabsOption(
-          toolbarColor: Colors.blue,
-          enableDefaultShare: true,
-          enableUrlBarHiding: true,
-          showPageTitle: true,
+      await launchUrl(
+        Uri.parse(url),
+        customTabsOptions: CustomTabsOptions(
+          colorSchemes: CustomTabsColorSchemes.defaults(
+            toolbarColor: Colors.blue,
+            navigationBarColor: Colors.black,
+          ),
+          shareState: CustomTabsShareState.on,
+          urlBarHidingEnabled: true,
+          showTitle: true,
         ),
-        safariVCOption: const SafariViewControllerOption(
-          preferredBarTintColor: Colors.black,
-          preferredControlTintColor: Colors.white,
+        safariVCOptions: const SafariViewControllerOptions(
+          preferredBarTintColor: Colors.blue,
+          preferredControlTintColor: Colors.black,
           barCollapsingEnabled: true,
+          entersReaderIfAvailable: false,
         ),
       );
     } catch (e) {

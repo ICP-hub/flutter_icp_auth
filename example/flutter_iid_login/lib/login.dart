@@ -14,9 +14,9 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-
   StreamSubscription? _sub;
-  String _linkMessage = "Your principal id will appear here";
+  final String _linkMessage = "Your principal id will appear here";
+  late List<Object> delegationObject;
 
   @override
   void initState() {
@@ -34,26 +34,18 @@ class _MyHomePageState extends State<MyHomePage> {
     try {
       final initialLink = await getInitialUri();
       if (initialLink != null) {
-        var queryParams = initialLink.queryParameters;
-        var delegationObject = IIDLoginState.fetchAgent(queryParams);
+        delegationObject =
+            await IIDLoginState.fetchAgent(initialLink.queryParameters, true);
         log("Delegation Object: $delegationObject");
-        setState(() {
-          _linkMessage = IIDLoginState.getPrincipal;
-        });
       }
     } catch (e) {
       log("Error: $e");
     }
 
-    // For links received while the app is running
-    _sub = uriLinkStream.listen((Uri? uri) {
+    _sub = uriLinkStream.listen((Uri? uri) async {
       if (uri != null) {
-        var queryParams = uri.queryParameters;
-        var delegationObject = IIDLoginState.fetchAgent(queryParams);
+        delegationObject = await IIDLoginState.fetchAgent(uri.queryParameters, true);
         log("Delegation Object: $delegationObject");
-        setState(() {
-          _linkMessage = IIDLoginState.getPrincipal;
-        });
       }
     }, onError: (err) {
       log("Error: $err");
@@ -62,7 +54,6 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
@@ -71,40 +62,40 @@ class _MyHomePageState extends State<MyHomePage> {
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                SizedBox(
-                  width: 200,
-                  height: 100,
-                  child: Image.asset('assets/images/logo.png'),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              SizedBox(
+                width: 200,
+                height: 100,
+                child: Image.asset('assets/images/logo.png'),
+              ),
+              const Text(
+                'Principal ID:',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
                 ),
-                const Text(
-                  'Principal ID:',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+              ),
+              Text(
+                _linkMessage,
+                style: const TextStyle(
+                  fontSize: 12,
                 ),
-                Text(
-                  _linkMessage,
-                  style: const TextStyle(
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(
-                  height: 40,
-                ),
-                const IIDLogin(
-                  text: "Sign In With Internet Identity",
-                  isComplete: true,
-                  scheme: "example",
-                  host: "exampleCallback",
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(
+                height: 40,
+              ),
+              const IIDLogin(
+                text: "Sign In With Internet Identity",
+                isComplete: true,
+                scheme: "example",
+                host: "exampleCallback",
+              ),
+            ],
           ),
+        ),
       ),
     );
   }
