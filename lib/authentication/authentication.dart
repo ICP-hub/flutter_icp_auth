@@ -7,6 +7,7 @@ import 'package:agent_dart/agent_dart.dart';
 import 'package:flutter_custom_tabs/flutter_custom_tabs.dart';
 
 import '../internal/_secure_store.dart';
+import '../validation/validation.dart';
 
 class IIDLogin extends StatefulWidget {
   const IIDLogin({
@@ -54,6 +55,19 @@ class IIDLoginState extends State<IIDLogin> {
   static get getPrincipal => _principalId;
 
   // --------------------------------------------------
+  // Read stored data and validate delegation
+  // --------------------------------------------------
+  static readData(bool local, String canisterId) async {
+    String pubKey = await SecureStore.readSecureData("pubKey");
+    String privKey = await SecureStore.readSecureData("privKey");
+    String delegation = await SecureStore.readSecureData("delegation");
+
+    var validatedDelegationValues = await DelegationValidation.validateDelegation(
+        pubKey, privKey, delegation, local, canisterId);
+    log("Validated Values, $validatedDelegationValues");
+  }
+
+  // --------------------------------------------------
   // Create Agent function
   // --------------------------------------------------
   static Future<List<Object>> fetchAgent(
@@ -69,7 +83,7 @@ class IIDLoginState extends State<IIDLogin> {
     SecureStore.writeSecureData(
         "pubKey", bytesToHex(_newIdentity!.getKeyPair().publicKey.toDer()));
     SecureStore.writeSecureData(
-        "identity", bytesToHex(_newIdentity!.getKeyPair().secretKey));
+        "privKey", bytesToHex(_newIdentity!.getKeyPair().secretKey));
     SecureStore.writeSecureData("delegation", delegationString);
 
     _principalId = delegationIdentity.getPrincipal().toText();

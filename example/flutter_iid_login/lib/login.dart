@@ -21,6 +21,8 @@ class _MyHomePageState extends State<MyHomePage> {
   StreamSubscription? _sub;
   late List<Object> delegationObject;
   String _principalId = "Your principal id will appear here";
+  bool isLocal = true; // To confirm if you running your project locally or using main-net
+  String canisterId = 'asrmz-lmaaa-aaaaa-qaaeq-cai'; // Backend canister Id
 
   @override
   void initState() {
@@ -39,28 +41,40 @@ class _MyHomePageState extends State<MyHomePage> {
   // Sends param to the flutter_icp_auth package to get the Agent and the delegationIdentity
   // Runs whoAmI() to demonstrate actor creation and making API calls
   Future<void> _initUniLinks() async {
+    Future<void> processUri(Uri? uri) async {
+      if (uri != null) {
+        try {
+          delegationObject =
+              await IIDLoginState.fetchAgent(uri.queryParameters, isLocal);
+          log("Delegation Object: $delegationObject");
+
+          setState(() {
+            _principalId = "Loading..";
+          });
+
+          IIDLoginState.readData(isLocal, canisterId);
+          whoAmI();
+        } catch (e) {
+          log("Error: $e");
+        }
+      }
+    }
+
     try {
       final initialLink = await getInitialUri();
-      if (initialLink != null) {
-        delegationObject =
-            await IIDLoginState.fetchAgent(initialLink.queryParameters, true);
-        log("Delegation Object: $delegationObject");
-        whoAmI();
-      }
+      await processUri(initialLink);
     } catch (e) {
       log("Error: $e");
     }
 
-    _sub = uriLinkStream.listen((Uri? uri) async {
-      if (uri != null) {
-        delegationObject =
-            await IIDLoginState.fetchAgent(uri.queryParameters, true);
-        log("Delegation Object: $delegationObject");
-        whoAmI();
-      }
-    }, onError: (err) {
-      log("Error: $err");
-    });
+    _sub = uriLinkStream.listen(
+      (Uri? uri) async {
+        await processUri(uri);
+      },
+      onError: (err) {
+        log("Error: $err");
+      },
+    );
   }
 
   // Extracts the HttpAgent from the delegation object received
@@ -72,7 +86,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     CanisterActor newActor = CanisterActor(
         ActorConfig(
-          canisterId: Principal.fromText('asrmz-lmaaa-aaaaa-qaaeq-cai'),
+          canisterId: Principal.fromText(canisterId),
           agent: extractedAgent!,
         ),
         FieldsMethod.idl);
