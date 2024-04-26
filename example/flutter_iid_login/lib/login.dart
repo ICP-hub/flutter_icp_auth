@@ -1,39 +1,88 @@
 import 'dart:async';
 import 'dart:developer';
 
+
 import 'package:flutter/material.dart';
+import 'package:flutter_icp_auth/internal/_secure_store.dart';
 import 'package:uni_links/uni_links.dart';
 import 'package:agent_dart/agent_dart.dart';
 import 'package:flutter_icp_auth/flutter_icp_auth.dart';
 
 import 'services/integration.dart';
+import 'helper/loader.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
-
   final String title;
-
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  CustomLoader customLoader = CustomLoader();
+  String _principalId = "Your principal id will appear here";
+  bool isLoggedIn = false;
+
+  // ---------------------------------------------------
+  // Must initialize these in your app
+  // ---------------------------------------------------
+
+  bool isLocal =
+      false; // To confirm if you running your project locally or using main-net
   StreamSubscription? _sub;
   late List<Object> delegationObject;
-  String _principalId = "Your principal id will appear here";
-  bool isLocal = true; // To confirm if you running your project locally or using main-net
-  String canisterId = 'asrmz-lmaaa-aaaaa-qaaeq-cai'; // Backend canister Id
+  String canisterId =
+      'cni7b-uaaaa-aaaag-qc6ra-cai'; // Main-net backend canister Id
+  // String canisterId = 'be2us-64aaa-aaaaa-qaabq-cai'; // Local backend canister Id
 
   @override
   void initState() {
     super.initState();
-    _initUniLinks();
+    _checkIfLoggedIn();
+    if(isLoggedIn == false) {
+      _initUniLinks();
+    }
   }
 
   @override
   void dispose() {
     _sub?.cancel();
     super.dispose();
+  }
+
+  void logout() async {
+    await SecureStore.deleteSecureData("pubKey");
+    await SecureStore.deleteSecureData("privKey");
+    await SecureStore.deleteSecureData("delegation");
+
+    setState(() {
+      isLoggedIn = false;
+      _principalId = "Your principal id will appear here";
+    });
+
+    _checkIfLoggedIn();
+  }
+
+  // To check whether user session is active
+  // It reads data from the secure store and delegates with those data if present
+  // Else it will follow the normal method of log in using the Sign In button
+  void _checkIfLoggedIn() async {
+    customLoader.showLoader('Checking...');
+
+    delegationObject = await IIDLoginState.readData(isLocal, canisterId);
+    isLoggedIn = delegationObject.whereType<bool>().first;
+
+    customLoader.dismissLoader();
+
+    if (isLoggedIn) {
+      customLoader.showSuccess("Login Successful");
+      whoAmI();
+    } else {
+      customLoader.showLoader("New user/Session expired, login again");
+      Future.delayed(const Duration(seconds: 2), () {
+        customLoader.dismissLoader();
+      });
+    }
   }
 
   // Initial state of the application
@@ -47,12 +96,7 @@ class _MyHomePageState extends State<MyHomePage> {
           delegationObject =
               await IIDLoginState.fetchAgent(uri.queryParameters, isLocal);
           log("Delegation Object: $delegationObject");
-
-          setState(() {
-            _principalId = "Loading..";
-          });
-
-          IIDLoginState.readData(isLocal, canisterId);
+          customLoader.showSuccess("Login Successful");
           whoAmI();
         } catch (e) {
           log("Error: $e");
@@ -81,22 +125,34 @@ class _MyHomePageState extends State<MyHomePage> {
   // Creates a new CanisterActor using the new Agent
   // Calling whoAmI() function to confirm user login and get user principalId
   Future<void> whoAmI() async {
-    HttpAgent? extractedAgent =
-        delegationObject.whereType<HttpAgent>().firstOrNull;
+    try {
+      customLoader.dismissLoader();
+      Future.delayed(const Duration(seconds: 1), () {
+        customLoader.showLoader("Loading your principal");
+      });
 
-    CanisterActor newActor = CanisterActor(
-        ActorConfig(
-          canisterId: Principal.fromText(canisterId),
-          agent: extractedAgent!,
-        ),
-        FieldsMethod.idl);
+      HttpAgent? extractedAgent =
+          delegationObject.whereType<HttpAgent>().firstOrNull;
 
-    var myPrincipal = await newActor.getFunc(FieldsMethod.whoAmI)?.call([]);
-    log("My principal: $myPrincipal");
+      CanisterActor newActor = CanisterActor(
+          ActorConfig(
+            canisterId: Principal.fromText(canisterId),
+            agent: extractedAgent!,
+          ),
+          FieldsMethod.idl);
 
-    setState(() {
-      _principalId = myPrincipal;
-    });
+      var myPrincipal = await newActor.getFunc(FieldsMethod.whoAmI)?.call([]);
+      log("My whoAmI principal: $myPrincipal");
+
+      customLoader.dismissLoader();
+
+      setState(() {
+        _principalId = myPrincipal;
+        isLoggedIn = true;
+      });
+    } catch (e) {
+      log("Error: $e");
+    }
   }
 
   @override
@@ -134,12 +190,30 @@ class _MyHomePageState extends State<MyHomePage> {
               const SizedBox(
                 height: 40,
               ),
-              const IIDLogin(
-                text: "Sign In With Internet Identity",
-                isComplete: true,
-                scheme: "example",
-                host: "exampleCallback",
-              ),
+              isLoggedIn == false
+                  ? const IIDLogin(
+                      text: "Sign In With Internet Identity",
+                      isComplete: true,
+                      scheme: "example",
+                      host: "exampleCallback")
+                  : ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        backgroundColor: Colors.pink,
+                        elevation: 8,
+                        // padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
+                      ),
+                      onPressed: () {
+                        logout();
+                      },
+                      child: const Text(
+                        'Log out',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
             ],
           ),
         ),

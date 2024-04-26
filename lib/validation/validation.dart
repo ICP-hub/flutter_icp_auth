@@ -12,8 +12,8 @@ abstract class NewFieldsMethod {
 }
 
 class DelegationValidation {
-  static Future<List<dynamic>> validateDelegation(
-      String pubKey, String privKey, String delegation, bool local, String canisterId) async {
+  static Future<List<Object>> validateDelegation(String pubKey, String privKey,
+      String delegation, bool local, String canisterId) async {
     try {
       // Generating appIdentity using the public and private key
       var keyPairValues = [pubKey, privKey];
@@ -60,11 +60,9 @@ class DelegationValidation {
           await newActor.getFunc(NewFieldsMethod.whoAmI)?.call([]);
       log("My new principal: $myPrincipal");
 
-      return ["Validation Successful", delegationIdentity, newAgent, newActor];
-
+      return [true, delegationIdentity, newAgent, newActor];
     } catch (e) {
-      log("Invalid Delegation Error: $e");
-      throw 'Invalid delegation data';
+      return [false, e];
     }
   }
 }
