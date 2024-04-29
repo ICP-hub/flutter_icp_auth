@@ -48,6 +48,7 @@ class IIDLoginState extends State<IIDLogin> {
   String? publicKeyString;
   static String? _principalId;
   String? _error;
+  static HttpAgent? _newAgent;
 
   // --------------------------------------------------
   // Get principal ID
@@ -97,7 +98,7 @@ class IIDLoginState extends State<IIDLogin> {
 
     _principalId = delegationIdentity.getPrincipal().toText();
 
-    HttpAgent newAgent = local
+    _newAgent = local
         ? HttpAgent(
             options: HttpAgentOptions(
               identity: delegationIdentity,
@@ -113,14 +114,35 @@ class IIDLoginState extends State<IIDLogin> {
             ),
           );
 
-    return [newAgent, delegationIdentity];
+    return [_newAgent!, delegationIdentity];
   }
 
   // --------------------------------------------------
   // Get Actor function
   // --------------------------------------------------
-  static void getActor(List<String> canisterIds, List<Service> idlServices) {
-    // TODO
+  static List<CanisterActor> getActor(
+      List<String> canisterIds, List<Service> idlServices) {
+    List<CanisterActor> actorsList = [];
+
+    for (int i = 0; i < canisterIds.length; i++) {
+      String canisterId = canisterIds[i];
+      Service idlService = idlServices[i];
+
+      HttpAgent actorAgent = _newAgent == null
+          ? DelegationValidation.validationAgent!
+          : _newAgent!;
+
+      CanisterActor newActor = CanisterActor(
+          ActorConfig(
+            canisterId: Principal.fromText(canisterId),
+            agent: actorAgent,
+          ),
+          idlService);
+
+      actorsList.add(newActor);
+    }
+
+    return actorsList;
   }
 
   // --------------------------------------------------
@@ -132,14 +154,11 @@ class IIDLoginState extends State<IIDLogin> {
       Ed25519PublicKey publicKey = _newIdentity!.getPublicKey();
       var publicKeyDer = publicKey.toDer();
       publicKeyString = bytesToHex(publicKeyDer);
-      // ---- Local replica ----
-      // const baseUrl = 'http://localhost:4943';
-      // final url =
-      //     '$baseUrl?sessionkey=$publicKeyString&canisterId=bkyz2-fmaaa-aaaaa-qaaaq-cai&host=${widget.host}&scheme=${widget.scheme}';
-      // ---- Main-net replica ----
+
       const baseUrl = 'https://nplfj-4yaaa-aaaag-qjucq-cai.icp0.io';
       final url =
           '$baseUrl?sessionkey=$publicKeyString&host=${widget.host}&scheme=${widget.scheme}';
+
       await launchUrl(
         Uri.parse(url),
         customTabsOptions: CustomTabsOptions(

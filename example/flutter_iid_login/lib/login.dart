@@ -23,16 +23,18 @@ class _MyHomePageState extends State<MyHomePage> {
   bool isLoggedIn = false;
 
   // ---------------------------------------------------
-  // Must initialize these in your app
+  // Must define these in your application
   // ---------------------------------------------------
 
   bool isLocal =
       false; // To confirm if you running your project locally or using main-net
   StreamSubscription? _sub;
   late List<Object> delegationObject;
-  String canisterId =
-      'cni7b-uaaaa-aaaag-qc6ra-cai'; // Main-net backend canister Id
-  // String canisterId = 'be2us-64aaa-aaaaa-qaabq-cai'; // Local backend canister Id
+  List<String> canisterId = [
+    'cni7b-uaaaa-aaaag-qc6ra-cai'
+  ]; // Main-net backend canister Id
+  // List<String> canisterId = ['be2us-64aaa-aaaaa-qaabq-cai']; // Local backend canister Id
+  List<Service> idlService = [FieldsMethod.idl]; // Add the idl services here
 
   @override
   void initState() {
@@ -49,6 +51,7 @@ class _MyHomePageState extends State<MyHomePage> {
     super.dispose();
   }
 
+  // Logout() to clear the session data and check the user login state
   void logout() async {
     await SecureStore.deleteSecureData("pubKey");
     await SecureStore.deleteSecureData("privKey");
@@ -98,7 +101,7 @@ class _MyHomePageState extends State<MyHomePage> {
           customLoader.showSuccess("Login Successful");
           whoAmI();
         } catch (e) {
-          log("Error: $e");
+          log("fetchAgent Error: $e");
         }
       }
     }
@@ -107,7 +110,7 @@ class _MyHomePageState extends State<MyHomePage> {
       final initialLink = await getInitialUri();
       await processUri(initialLink);
     } catch (e) {
-      log("Error: $e");
+      log("initialLink Error: $e");
     }
 
     _sub = uriLinkStream.listen(
@@ -115,7 +118,7 @@ class _MyHomePageState extends State<MyHomePage> {
         await processUri(uri);
       },
       onError: (err) {
-        log("Error: $err");
+        log("uriLinkStream Error: $err");
       },
     );
   }
@@ -130,17 +133,12 @@ class _MyHomePageState extends State<MyHomePage> {
         customLoader.showLoader("Loading your principal");
       });
 
-      HttpAgent? extractedAgent =
-          delegationObject.whereType<HttpAgent>().firstOrNull;
+      // Calling getActor() from the package to get the list of all the canister actors
+      List<CanisterActor> newActors =
+          IIDLoginState.getActor(canisterId, idlService);
 
-      CanisterActor newActor = CanisterActor(
-          ActorConfig(
-            canisterId: Principal.fromText(canisterId),
-            agent: extractedAgent!,
-          ),
-          FieldsMethod.idl);
-
-      var myPrincipal = await newActor.getFunc(FieldsMethod.whoAmI)?.call([]);
+      var myPrincipal =
+          await newActors[0].getFunc(FieldsMethod.whoAmI)?.call([]);
       log("My whoAmI principal: $myPrincipal");
 
       customLoader.dismissLoader();
@@ -150,7 +148,7 @@ class _MyHomePageState extends State<MyHomePage> {
         isLoggedIn = true;
       });
     } catch (e) {
-      log("Error: $e");
+      log("whoAmI Error: $e");
     }
   }
 

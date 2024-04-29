@@ -12,6 +12,8 @@ abstract class NewFieldsMethod {
 }
 
 class DelegationValidation {
+
+  static HttpAgent? validationAgent;
   static Future<List<Object>> validateDelegation(
       String pubKey, String privKey, String delegation) async {
     try {
@@ -28,7 +30,7 @@ class DelegationValidation {
           DelegationIdentity(newIde, delegationChain);
 
       // Creating HttpAgent using the delegation Identity
-      HttpAgent newAgent = HttpAgent(
+      validationAgent = HttpAgent(
           options: HttpAgentOptions(
         identity: delegationIdentity,
         host: 'icp-api.io',
@@ -38,15 +40,14 @@ class DelegationValidation {
       CanisterActor newActor = CanisterActor(
           ActorConfig(
             canisterId: Principal.fromText('cni7b-uaaaa-aaaag-qc6ra-cai'),
-            agent: newAgent,
+            agent: validationAgent,
           ),
           NewFieldsMethod.idl);
 
       // Calling whoAmI to confirm API call
-      var myPrincipal =
-          await newActor.getFunc(NewFieldsMethod.whoAmI)?.call([]);
+      await newActor.getFunc(NewFieldsMethod.whoAmI)?.call([]);
 
-      return [true, delegationIdentity, newAgent, newActor];
+      return [true, validationAgent!, delegationIdentity];
     } catch (e) {
       return [false, e];
     }
