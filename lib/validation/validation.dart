@@ -1,7 +1,7 @@
-import 'dart:developer';
 import 'dart:convert';
 import 'package:agent_dart/agent_dart.dart';
 
+// Class for defining the IDL service for the whoAmI()
 abstract class NewFieldsMethod {
   static const whoAmI = 'whoami';
   static final ServiceClass idl = IDL.Service(
@@ -12,8 +12,8 @@ abstract class NewFieldsMethod {
 }
 
 class DelegationValidation {
-  static Future<List<Object>> validateDelegation(String pubKey, String privKey,
-      String delegation, bool local, String canisterId) async {
+  static Future<List<Object>> validateDelegation(
+      String pubKey, String privKey, String delegation) async {
     try {
       // Generating appIdentity using the public and private key
       var keyPairValues = [pubKey, privKey];
@@ -27,30 +27,17 @@ class DelegationValidation {
       DelegationIdentity delegationIdentity =
           DelegationIdentity(newIde, delegationChain);
 
-      // Creating HTTPAgent using the new delegationIdentity
-      HttpAgent newAgent;
-      if (local) {
-        newAgent = HttpAgent(
+      // Creating HttpAgent using the delegation Identity
+      HttpAgent newAgent = HttpAgent(
           options: HttpAgentOptions(
-            identity: delegationIdentity,
-          ),
-          defaultHost: 'localhost',
-          defaultPort: 4943,
-          defaultProtocol: 'http',
-        );
-      } else {
-        newAgent = HttpAgent(
-          options: HttpAgentOptions(
-            identity: delegationIdentity,
-            host: 'icp-api.io',
-          ),
-        );
-      }
+        identity: delegationIdentity,
+        host: 'icp-api.io',
+      ));
 
       // Creating a new CanisterActor using the new Agent
       CanisterActor newActor = CanisterActor(
           ActorConfig(
-            canisterId: Principal.fromText(canisterId),
+            canisterId: Principal.fromText('cni7b-uaaaa-aaaag-qc6ra-cai'),
             agent: newAgent,
           ),
           NewFieldsMethod.idl);
@@ -58,7 +45,6 @@ class DelegationValidation {
       // Calling whoAmI to confirm API call
       var myPrincipal =
           await newActor.getFunc(NewFieldsMethod.whoAmI)?.call([]);
-      log("My new principal: $myPrincipal");
 
       return [true, delegationIdentity, newAgent, newActor];
     } catch (e) {

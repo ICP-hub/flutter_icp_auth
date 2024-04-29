@@ -57,7 +57,7 @@ class IIDLoginState extends State<IIDLogin> {
   // --------------------------------------------------
   // Read stored data and validate delegation
   // --------------------------------------------------
-  static Future<List<Object>> readData(bool local, String canisterId) async {
+  static Future<List<Object>> readData() async {
     if ((await SecureStore.readSecureData("pubKey") == null) ||
         (await SecureStore.readSecureData("privKey") == null) ||
         (await SecureStore.readSecureData("delegation") == null)) {
@@ -69,7 +69,7 @@ class IIDLoginState extends State<IIDLogin> {
 
       var validatedDelegationValues =
           await DelegationValidation.validateDelegation(
-              pubKey, privKey, delegation, local, canisterId);
+              pubKey, privKey, delegation);
       log("Validated Values, $validatedDelegationValues");
 
       return validatedDelegationValues;
@@ -97,26 +97,30 @@ class IIDLoginState extends State<IIDLogin> {
 
     _principalId = delegationIdentity.getPrincipal().toText();
 
-    HttpAgent newAgent;
-    if (local) {
-      newAgent = HttpAgent(
-        options: HttpAgentOptions(
-          identity: delegationIdentity,
-        ),
-        defaultHost: 'localhost',
-        defaultPort: 4943,
-        defaultProtocol: 'http',
-      );
-    } else {
-      newAgent = HttpAgent(
-        options: HttpAgentOptions(
-          identity: delegationIdentity,
-          host: 'icp-api.io',
-        ),
-      );
-    }
+    HttpAgent newAgent = local
+        ? HttpAgent(
+            options: HttpAgentOptions(
+              identity: delegationIdentity,
+            ),
+            defaultHost: 'localhost',
+            defaultPort: 4943,
+            defaultProtocol: 'http',
+          )
+        : HttpAgent(
+            options: HttpAgentOptions(
+              identity: delegationIdentity,
+              host: 'icp-api.io',
+            ),
+          );
 
     return [newAgent, delegationIdentity];
+  }
+
+  // --------------------------------------------------
+  // Get Actor function
+  // --------------------------------------------------
+  static void getActor(List<String> canisterIds, List<Service> idlServices) {
+    // TODO
   }
 
   // --------------------------------------------------
@@ -134,7 +138,8 @@ class IIDLoginState extends State<IIDLogin> {
       //     '$baseUrl?sessionkey=$publicKeyString&canisterId=bkyz2-fmaaa-aaaaa-qaaaq-cai&host=${widget.host}&scheme=${widget.scheme}';
       // ---- Main-net replica ----
       const baseUrl = 'https://nplfj-4yaaa-aaaag-qjucq-cai.icp0.io';
-      final url = '$baseUrl?sessionkey=$publicKeyString&host=${widget.host}&scheme=${widget.scheme}';
+      final url =
+          '$baseUrl?sessionkey=$publicKeyString&host=${widget.host}&scheme=${widget.scheme}';
       await launchUrl(
         Uri.parse(url),
         customTabsOptions: CustomTabsOptions(

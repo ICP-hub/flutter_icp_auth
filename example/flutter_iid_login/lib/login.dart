@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:developer';
 
-
 import 'package:flutter/material.dart';
 import 'package:flutter_icp_auth/internal/_secure_store.dart';
 import 'package:uni_links/uni_links.dart';
@@ -39,7 +38,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState() {
     super.initState();
     _checkIfLoggedIn();
-    if(isLoggedIn == false) {
+    if (isLoggedIn == false) {
       _initUniLinks();
     }
   }
@@ -69,7 +68,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void _checkIfLoggedIn() async {
     customLoader.showLoader('Checking...');
 
-    delegationObject = await IIDLoginState.readData(isLocal, canisterId);
+    delegationObject = await IIDLoginState.readData();
     isLoggedIn = delegationObject.whereType<bool>().first;
 
     customLoader.dismissLoader();
