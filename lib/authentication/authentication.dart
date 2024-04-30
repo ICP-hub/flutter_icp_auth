@@ -118,9 +118,26 @@ class IIDLoginState extends State<IIDLogin> {
   }
 
   // --------------------------------------------------
-  // Get Actor function
+  // Get Actor functions
   // --------------------------------------------------
-  static List<CanisterActor> getActor(
+
+  // Get one actor
+  static CanisterActor getActor(String canisterIds, Service idlServices) {
+    HttpAgent actorAgent =
+        _newAgent == null ? DelegationValidation.validationAgent! : _newAgent!;
+
+    CanisterActor newActor = CanisterActor(
+        ActorConfig(
+          canisterId: Principal.fromText(canisterIds),
+          agent: actorAgent,
+        ),
+        idlServices);
+
+    return newActor;
+  }
+
+  // Get all actors
+  static List<CanisterActor> getAllActors(
       List<String> canisterIds, List<Service> idlServices) {
     List<CanisterActor> actorsList = [];
 

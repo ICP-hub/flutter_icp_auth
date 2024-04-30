@@ -27,15 +27,15 @@ class _MyHomePageState extends State<MyHomePage> {
   // ---------------------------------------------------
 
   bool isLocal =
-      false; // To confirm if you running your project locally or using main-net
+      false; // To confirm if you running your project locally or using main-net. Change it to true if running locally
   StreamSubscription? _sub;
   late List<Object> delegationObject;
-  List<String> canisterId = [
-    'cni7b-uaaaa-aaaag-qc6ra-cai'
-  ]; // Main-net backend canister Id
-  // List<String> canisterId = ['be2us-64aaa-aaaaa-qaabq-cai']; // Local backend canister Id
-  List<Service> idlService = [FieldsMethod.idl]; // Add the idl services here
+  String canisterId =
+      'cni7b-uaaaa-aaaag-qc6ra-cai'; // Replace it with your backend canister id
+  Service idlService =
+      FieldsMethod.idl; // Idl service (Location: lib/services/integration.dart)
 
+  // Add this in the app to check the login state when app is opened
   @override
   void initState() {
     super.initState();
@@ -45,6 +45,7 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  // Add this to cancel the sub and dispose the state
   @override
   void dispose() {
     _sub?.cancel();
@@ -56,6 +57,8 @@ class _MyHomePageState extends State<MyHomePage> {
     await SecureStore.deleteSecureData("pubKey");
     await SecureStore.deleteSecureData("privKey");
     await SecureStore.deleteSecureData("delegation");
+
+    // You can add any more functionality such as clearing your app state based on your application requirement
 
     setState(() {
       isLoggedIn = false;
@@ -134,11 +137,9 @@ class _MyHomePageState extends State<MyHomePage> {
       });
 
       // Calling getActor() from the package to get the list of all the canister actors
-      List<CanisterActor> newActors =
-          IIDLoginState.getActor(canisterId, idlService);
+      CanisterActor newActor = IIDLoginState.getActor(canisterId, idlService);
 
-      var myPrincipal =
-          await newActors[0].getFunc(FieldsMethod.whoAmI)?.call([]);
+      var myPrincipal = await newActor.getFunc(FieldsMethod.whoAmI)?.call([]);
       log("My whoAmI principal: $myPrincipal");
 
       customLoader.dismissLoader();

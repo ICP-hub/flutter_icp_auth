@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'login.dart';
+
 void main() {
   runApp(const MyApp());
 }
@@ -22,4 +23,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-
