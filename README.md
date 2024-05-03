@@ -144,6 +144,8 @@ When passing argument in the IIDLogin button, remember to pass your app:host and
 
 ## **ℹ️ Additional Info:**
 
+#### 📄 Example file location: `example/lib/login.dart`
+
 #### This package depends on the following dependencies:
 
 * agent_dart: ^1.0.0-dev.22

@@ -1,6 +1,6 @@
 name: flutter_icp_auth
 description: "A Flutter-ICP package to automate internet identity authentication."
-version: 1.0.0
+version: 1.0.1
 homepage: https://github.com/ICP-hub/flutter_icp_auth
 
 environment:
