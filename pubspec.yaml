@@ -1,7 +1,7 @@
 name: flutter_icp_auth
-description: "A new Flutter package project."
-version: 0.0.1
-homepage:
+description: "A Flutter-ICP package to automate internet identity authentication."
+version: 1.0.0
+homepage: https://github.com/ICP-hub/flutter_icp_auth
 
 environment:
   sdk: '>=3.3.1 <4.0.0'
@@ -11,7 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   agent_dart: ^1.0.0-dev.22
-  fluttertoast: ^8.2.4
+  fluttertoast: ^8.2.5
   uni_links: ^0.5.1
   flutter_custom_tabs: ^2.0.0+1
   flutter_secure_storage: ^9.0.0

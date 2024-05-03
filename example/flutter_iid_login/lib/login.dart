@@ -23,7 +23,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool isLoggedIn = false;
 
   // ---------------------------------------------------
-  // Must define these in your application
+  // Must declare these in your application
   // ---------------------------------------------------
 
   bool isLocal =
