@@ -12,7 +12,6 @@ abstract class NewFieldsMethod {
 }
 
 class DelegationValidation {
-
   static HttpAgent? validationAgent;
   static Future<List<Object>> validateDelegation(
       String pubKey, String privKey, String delegation) async {
