@@ -1,15 +1,6 @@
 import 'dart:convert';
 import 'package:agent_dart/agent_dart.dart';
-
-// Class for defining the IDL service for the whoAmI()
-abstract class NewFieldsMethod {
-  static const whoAmI = 'whoami';
-  static final ServiceClass idl = IDL.Service(
-    {
-      NewFieldsMethod.whoAmI: IDL.Func([], [IDL.Text], []),
-    },
-  );
-}
+import '../internal/auth_idl.dart';
 
 class DelegationValidation {
   static HttpAgent? validationAgent;
@@ -41,12 +32,13 @@ class DelegationValidation {
             canisterId: Principal.fromText('cni7b-uaaaa-aaaag-qc6ra-cai'),
             agent: validationAgent,
           ),
-          NewFieldsMethod.idl);
+          FieldsMethod.idl);
 
       // Calling whoAmI to confirm API call
-      await newActor.getFunc(NewFieldsMethod.whoAmI)?.call([]);
+      var validatedPrincipal =
+          await newActor.getFunc(FieldsMethod.whoAmI)?.call([]);
 
-      return [true, validationAgent!, delegationIdentity];
+      return [true, validatedPrincipal, validationAgent!, delegationIdentity];
     } catch (e) {
       return [false, e];
     }

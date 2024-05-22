@@ -12,3 +12,8 @@
 
 * Formatted the code
 * Added documentation to the SecureStore
+
+## 2.0.0
+
+* Optimized the code
+* More functionality from the package
