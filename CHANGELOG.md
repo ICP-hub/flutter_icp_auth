@@ -17,3 +17,8 @@
 
 * Optimized the code
 * More functionality from the package
+
+## 2.0.1
+
+* Updated middle page repository
+* Added troubleshooting

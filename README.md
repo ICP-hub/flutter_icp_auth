@@ -47,11 +47,11 @@ This Flutter package simplifies integrating ICP internet identity authentication
 
 * **Local:**
 
-  Clone the repo from here and deploy locally: https://github.com/SomyaRanjanSahu/flutter_icp_auth_middleware
+  Clone the repo from here and deploy locally: https://github.com/ICP-hub/flutter_icp_auth_middleware
 
 * **Main-net:**
 
-  a. You can deploy the cloned [middlePage](https://github.com/SomyaRanjanSahu/flutter_icp_auth_middleware) to main net and use the main net canister id.
+  a. You can deploy the cloned [middlePage](https://github.com/ICP-hub/flutter_icp_auth_middleware) to main net and use the main net canister id.
 
   OR
 
@@ -179,7 +179,47 @@ Replace the argument host and scheme with your app's host and scheme
 `List<Object> logoutValidation =
 await AuthLogout.logout(isLocal, backendCanisterId);`
 
-## **ℹ️ Additional Info:**
+## **❗Troubleshooting**
+
+#### 1. `ZipFileEncoder.close` and `SingingBlockZipFileEncoder.close` error:
+
+![Error](https://i.postimg.cc/wjNdhhTB/Screenshot-2024-05-24-232308.png)
+
+* Go the *agent_dart* package location: `agent_dart-1.0.0-dev.22/lib/archiver/encoder.dart:162:8`
+
+* Replace:
+  ```
+  void close() {
+    _encoder.writeBlock(_output);
+    _encoder.endEncode();
+    _output.close();
+  }
+  ```
+
+  with:
+  ```
+  Future<void> close() async{
+  _encoder.writeBlock(_output);
+  _encoder.endEncode();
+  await _output.close();
+  }
+  ```
+
+#### 2. minSdkVersion error:
+
+* Go the code location: `example\android\app\build.gradle`
+* Change the minSdkVersion to **23**
+
+  ```
+  defaultConfig {
+      minSdkVersion 23
+      targetSdkVersion flutter.targetSdkVersion
+      versionCode flutterVersionCode.toInteger()
+      versionName flutterVersionName
+  }
+  ```
+
+## **ℹ️ Additional Info**
 
 #### 📄 Example file location: `example/lib/main.dart`
 
