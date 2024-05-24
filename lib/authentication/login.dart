@@ -59,45 +59,50 @@ class AuthLogIn {
   // --------------------------------------------------
   static Future<List<Object>> fetchAgent(Map<String, String> queryParams,
       bool local, String canisterId, Service idLService) async {
-    String delegationString = queryParams['del'].toString();
+    try {
+      String delegationString = queryParams['del'].toString();
 
-    String decodedDelegation = Uri.decodeComponent(delegationString);
-    DelegationChain delegationChain =
-        DelegationChain.fromJSON(jsonDecode(decodedDelegation));
-    DelegationIdentity delegationIdentity =
-        DelegationIdentity(_newIdentity!, delegationChain);
+      String decodedDelegation = Uri.decodeComponent(delegationString);
+      DelegationChain delegationChain =
+          DelegationChain.fromJSON(jsonDecode(decodedDelegation));
+      DelegationIdentity delegationIdentity =
+          DelegationIdentity(_newIdentity!, delegationChain);
 
-    // Storing keys in local for autoLogin
-    SecureStore.writeSecureData(
-        "pubKey", bytesToHex(_newIdentity!.getKeyPair().publicKey.toDer()));
-    SecureStore.writeSecureData(
-        "privKey", bytesToHex(_newIdentity!.getKeyPair().secretKey));
-    SecureStore.writeSecureData("delegation", delegationString);
+      // Storing keys in local for autoLogin
+      SecureStore.writeSecureData(
+          "pubKey", bytesToHex(_newIdentity!.getKeyPair().publicKey.toDer()));
+      SecureStore.writeSecureData(
+          "privKey", bytesToHex(_newIdentity!.getKeyPair().secretKey));
+      SecureStore.writeSecureData("delegation", delegationString);
 
-    _principalId = delegationIdentity.getPrincipal().toText();
+      _principalId = delegationIdentity.getPrincipal().toText();
 
-    newAgent = local
-        ? HttpAgent(
-            options: HttpAgentOptions(
-              identity: delegationIdentity,
-            ),
-            defaultHost: 'localhost',
-            defaultPort: 4943,
-            defaultProtocol: 'http',
-          )
-        : HttpAgent(
-            options: HttpAgentOptions(
-              identity: delegationIdentity,
-              host: 'icp-api.io',
-            ),
-          );
+      newAgent = local
+          ? HttpAgent(
+              options: HttpAgentOptions(
+                identity: delegationIdentity,
+              ),
+              defaultHost: 'localhost',
+              defaultPort: 4943,
+              defaultProtocol: 'http',
+            )
+          : HttpAgent(
+              options: HttpAgentOptions(
+                identity: delegationIdentity,
+                host: 'icp-api.io',
+              ),
+            );
 
-    CanisterActor delegatedActor = getActor(canisterId, idLService);
+      CanisterActor delegatedActor = getActor(canisterId, idLService);
 
-    var hexPrincipalId =
-        await delegatedActor.getFunc(FieldsMethod.whoAmI)?.call([]);
+      var hexPrincipalId =
+          await delegatedActor.getFunc(FieldsMethod.whoAmI)?.call([]);
 
-    return [hexPrincipalId, newAgent!, delegationIdentity];
+      return [hexPrincipalId, newAgent!, delegationIdentity];
+    } catch (e) {
+      log("Fetch Agent Error: $e");
+      return [];
+    }
   }
 
   // --------------------------------------------------
@@ -108,19 +113,18 @@ class AuthLogIn {
   // --------------------------------------------------
   // Read stored data and validate delegation
   // --------------------------------------------------
-  static Future<List<Object>> getDelegations() async {
-    if ((await SecureStore.readSecureData("pubKey") == null) ||
-        (await SecureStore.readSecureData("privKey") == null) ||
-        (await SecureStore.readSecureData("delegation") == null)) {
+  static Future<List<Object>> getDelegations(
+      bool isLocal, String canisterId) async {
+    String? pubKey = await SecureStore.readSecureData("pubKey");
+    String? privKey = await SecureStore.readSecureData("privKey");
+    String? delegation = await SecureStore.readSecureData("delegation");
+
+    if (pubKey == null || privKey == null || delegation == null) {
       return [false];
     } else {
-      String pubKey = await SecureStore.readSecureData("pubKey");
-      String privKey = await SecureStore.readSecureData("privKey");
-      String delegation = await SecureStore.readSecureData("delegation");
-
       var validatedDelegationValues =
           await DelegationValidation.validateDelegation(
-              pubKey, privKey, delegation);
+              isLocal, canisterId, pubKey, privKey, delegation);
       log("Validated Values, $validatedDelegationValues");
 
       return validatedDelegationValues;
@@ -128,9 +132,38 @@ class AuthLogIn {
   }
 
   // --------------------------------------------------
+  // Check Delegations
+  // --------------------------------------------------
+  static Future<bool> checkLoginStatus(
+      bool isLocal, String backendCanisterId) async {
+    List<Object> validatedDelegation =
+        await getDelegations(isLocal, backendCanisterId);
+    if (validatedDelegation.whereType<bool>().first) {
+      _principalId = validatedDelegation[1].toString();
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  static Future<List<Object?>> manualLogin(Uri uri, bool isLocal,
+      String backendCanisterId, Service idlService) async {
+    List<dynamic> result = await AuthLogIn.fetchAgent(
+        uri.queryParameters, isLocal, backendCanisterId, idlService);
+    if (result.isNotEmpty) {
+      bool isLoggedIn = uri.queryParameters['status'] == "true" ? true : false;
+      _principalId = result[0].toString();
+      return [isLoggedIn, _principalId];
+    } else {
+      return [false, "Log in to see your principal"];
+    }
+  }
+
+  // --------------------------------------------------
   // Get Actor functions
   // --------------------------------------------------
 
+  // Get a single actor
   static CanisterActor getActor(String canisterIds, Service idlServices) {
     HttpAgent actorAgent =
         newAgent == null ? DelegationValidation.validationAgent! : newAgent!;

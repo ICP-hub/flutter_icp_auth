@@ -1,13 +1,9 @@
 import 'dart:async';
-import 'dart:developer';
-
 import 'integration.dart';
 
 import 'package:flutter/material.dart';
-import 'package:uni_links/uni_links.dart';
 import 'package:agent_dart/agent_dart.dart';
 import 'package:flutter_icp_auth/flutter_icp_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const MyApp());
@@ -38,23 +34,21 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  String _principalId = "Log In to see your principal";
+  String _principalId = "Log in to see your principal";
   bool isLoggedIn = false;
 
   // ---------------------------------------------------
   // Must declare these in your application
   // ---------------------------------------------------
 
-  bool _initialized = false;
   bool isLocal =
       false; // To confirm if you running your project locally or using main-net. Change it to true if running locally
-  StreamSubscription? _sub;
+  Service idlService =
+      FieldsMethod.idl; // Idl service (Location: lib/integration.dart)
   String backendCanisterId =
       'cni7b-uaaaa-aaaag-qc6ra-cai'; // Replace it with your backend canisterId
   String middlePageCanisterId =
       'nplfj-4yaaa-aaaag-qjucq-cai'; // Replace it with your middlePage canisterId
-  Service idlService =
-      FieldsMethod.idl; // Idl service (Location: lib/services/integration.dart)
 
   // ---------------------------------------------------------------
   // Add this in the app to check the login state when app is opened
@@ -63,73 +57,46 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    initPlatformState();
+    AuthLogIn.checkLoginStatus(isLocal, backendCanisterId).then((loggedIn) {
+      setState(() {
+        isLoggedIn = loggedIn;
+        if (loggedIn) {
+          _principalId = AuthLogIn.getPrincipal;
+        }
+      });
+      if (!loggedIn) {
+        UrlListener.handleInitialUri(_manualLogin, () {});
+        UrlListener.initListener(_manualLogin);
+      }
+    });
   }
 
   @override
   void dispose() {
-    _sub?.cancel();
+    UrlListener.cancelListener();
     super.dispose();
   }
 
-  Future<void> initPlatformState() async {
-    try {
-      // Checking initial link
-      final initialUri = await getInitialUri();
-      if (initialUri != null) {
-        _handleUri(initialUri);
-      }
-    } catch (e) {
-      log("Initial Link Error: $e");
-    }
-
-    // Attaching listener for later links
-    _sub = uriLinkStream.listen((Uri? uri) {
-      if (uri != null) {
-        _handleUri(uri);
-      }
-    }, onError: (err) {
-      log("Later Link Error: $err");
-    });
-  }
-
-  void _handleUri(uri) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-
-    if (_initialized) {
-      // Handling URI when coming from middle page
-      String status = uri.queryParameters['status'].toString();
-      List<Object> delegationObject = await AuthLogIn.fetchAgent(
-          uri.queryParameters, isLocal, backendCanisterId, idlService);
-
+  // Add this function to call the fetchAgent function to get the log-in values
+  Future<void> _manualLogin(Uri uri) async {
+    List<dynamic> result = await AuthLogIn.fetchAgent(
+        uri.queryParameters, isLocal, backendCanisterId, idlService);
+    if (result.isNotEmpty) {
       setState(() {
-        isLoggedIn = status == "true" ? true : false;
-        _principalId = delegationObject[0].toString();
+        isLoggedIn = uri.queryParameters['status'] == "true" ? true : false;
+        _principalId = result[0];
       });
     } else {
-      // Handling URI when app is reloaded or opened directly
-      String? savedUri = prefs.getString('last_uri');
-      if (savedUri == uri) {
-        log('Ignoring last saved URI');
-      } else {
-        // Performing action based on the URI
-        List<Object> validatedDelegation = await AuthLogIn.getDelegations();
-
-        setState(() {
-          isLoggedIn = validatedDelegation.whereType<bool>().first == true
-              ? true
-              : false;
-        });
-        if (isLoggedIn == true) {
-          setState(() {
-            _principalId = validatedDelegation[1].toString();
-          });
-        }
-        prefs.setString('last_uri', uri.toString());
-      }
-      _initialized = true;
+      setState(() {
+        isLoggedIn = false;
+        _principalId = "Log in to see your principal";
+      });
     }
   }
+
+  // ---------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -173,9 +140,10 @@ class _MyHomePageState extends State<MyHomePage> {
                         backgroundColor: Colors.pink,
                         elevation: 8,
                       ),
-                      onPressed: () {
-                        AuthLogIn.authenticate(isLocal, middlePageCanisterId,
-                            "exampleCallback", "example");
+                      onPressed: () async {
+                        // replace the argument host and scheme with your apps host and scheme
+                        await AuthLogIn.authenticate(isLocal,
+                            middlePageCanisterId, "exampleCallback", "example");
                       },
                       child: const Text(
                         'Log In',
@@ -193,15 +161,13 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                       onPressed: () async {
                         List<Object> logoutValidation =
-                            await AuthLogout.logout();
+                            await AuthLogout.logout(isLocal, backendCanisterId);
+                        // Changing the state of log in and principal id based on this example app requirement
                         setState(() {
-                          isLoggedIn =
-                              logoutValidation.whereType<bool>().first == true
-                                  ? true
-                                  : false;
-                          _principalId = isLoggedIn == true
+                          isLoggedIn = logoutValidation.whereType<bool>().first;
+                          _principalId = isLoggedIn
                               ? logoutValidation[1].toString()
-                              : "Log In to see your principal";
+                              : "Log in to see your principal";
                         });
                       },
                       child: const Text(

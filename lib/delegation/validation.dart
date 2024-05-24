@@ -5,7 +5,11 @@ import '../internal/auth_idl.dart';
 class DelegationValidation {
   static HttpAgent? validationAgent;
   static Future<List<Object>> validateDelegation(
-      String pubKey, String privKey, String delegation) async {
+      bool isLocal,
+      String canisterId,
+      String pubKey,
+      String privKey,
+      String delegation) async {
     try {
       // Generating appIdentity using the public and private key
       var keyPairValues = [pubKey, privKey];
@@ -20,16 +24,26 @@ class DelegationValidation {
           DelegationIdentity(newIde, delegationChain);
 
       // Creating HttpAgent using the delegation Identity
-      validationAgent = HttpAgent(
-          options: HttpAgentOptions(
-        identity: delegationIdentity,
-        host: 'icp-api.io',
-      ));
+      validationAgent = isLocal
+          ? HttpAgent(
+              options: HttpAgentOptions(
+                identity: delegationIdentity,
+              ),
+              defaultHost: 'localhost',
+              defaultPort: 4943,
+              defaultProtocol: 'http',
+            )
+          : HttpAgent(
+              options: HttpAgentOptions(
+                identity: delegationIdentity,
+                host: 'icp-api.io',
+              ),
+            );
 
       // Creating a new CanisterActor using the new Agent
       CanisterActor newActor = CanisterActor(
           ActorConfig(
-            canisterId: Principal.fromText('cni7b-uaaaa-aaaag-qc6ra-cai'),
+            canisterId: Principal.fromText(canisterId),
             agent: validationAgent,
           ),
           FieldsMethod.idl);

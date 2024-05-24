@@ -53,11 +53,15 @@ This Flutter package simplifies integrating ICP internet identity authentication
 
   a. You can deploy the cloned [middlePage](https://github.com/SomyaRanjanSahu/flutter_icp_auth_middleware) to main net and use the main net canister id.
 
+  OR
+
   b. You can use our main-net id as well: `nplfj-4yaaa-aaaag-qjucq-cai`
 
 #### 4. For IDL and Services:
 
 * You can use [candid_dart](https://pub.dev/packages/candid_dart) to generate the did files and the IDL services and then use them in the app as demonstrated in the example app.
+
+  OR
 
 * You can add/write the file or code manually and then use them accordingly.
 
@@ -70,18 +74,14 @@ This Flutter package simplifies integrating ICP internet identity authentication
   ```
   dependencies:
     flutter_icp_auth: ^1.0.0
-    uni_links: ^0.5.1
     agent_dart: ^1.0.0-dev.22
-    shared_preferences: ^2.2.3
   ```
 
 * **Import the packages in you *main.dart*:**
 
   ``` 
-  import 'package:uni_links/uni_links.dart';
   import 'package:agent_dart/agent_dart.dart';
   import 'package:flutter_icp_auth/flutter_icp_auth.dart';
-  import 'package:shared_preferences/shared_preferences.dart';
   ```
 
 * **Configure Deep Linking in AndroidManifest.XML:**
@@ -104,16 +104,14 @@ This Flutter package simplifies integrating ICP internet identity authentication
 * **Declare your variables:**
 
   ```
-  bool _initialized = false;
   bool isLocal =
       false; // To confirm if you running your project locally or using main-net. Change it to true if running locally
-  StreamSubscription? _sub;
+  Service idlService =
+      FieldsMethod.idl; // Idl service (Location: lib/integration.dart)
   String backendCanisterId =
       'cni7b-uaaaa-aaaag-qc6ra-cai'; // Replace it with your backend canisterId
   String middlePageCanisterId =
       'nplfj-4yaaa-aaaag-qjucq-cai'; // Replace it with your middlePage canisterId
-  Service idlService =
-      FieldsMethod.idl; // Idl service (Location: lib/services/integration.dart)
   ```
 
 * **Define the initState and dispose methods:**
@@ -122,77 +120,45 @@ This Flutter package simplifies integrating ICP internet identity authentication
   @override
   void initState() {
     super.initState();
-    initPlatformState();
+    AuthLogIn.checkLoginStatus(isLocal, backendCanisterId).then((loggedIn) {
+      setState(() {
+        isLoggedIn = loggedIn;
+        if (loggedIn) {
+          _principalId = AuthLogIn.getPrincipal;
+        }
+      });
+      if (!loggedIn) {
+        UrlListener.handleInitialUri(_fetchAgent, () {});
+        UrlListener.initListener(_fetchAgent);
+      }
+    });
   }
 
   @override
   void dispose() {
-    _sub?.cancel();
+    UrlListener.cancelListener();
     super.dispose();
   } 
   ```
 
-* **Handle incoming deep links:**
+* **Manual login:**
 
   `isLoggedIn` and `_principalId` are used to change the state of the log in/log out button and principal text. You can modify them according to your applications need.
 
   ```
-  Future<void> initPlatformState() async {
-    try {
-      // Checking initial link
-      final initialUri = await getInitialUri();
-      if (initialUri != null) {
-        _handleUri(initialUri);
-      }
-    } catch (e) {
-      log("Initial Link Error: $e");
-    }
-
-    // Attaching listener for later links
-    _sub = uriLinkStream.listen((Uri? uri) {
-      if (uri != null) {
-        _handleUri(uri);
-      }
-    }, onError: (err) {
-      log("Later Link Error: $err");
-    });
-  }
-
-  void _handleUri(uri) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-
-    if (_initialized) {
-      // Handling URI when coming from middle page
-      String status = uri.queryParameters['status'].toString();
-      List<Object> delegationObject = await AuthLogIn.fetchAgent(
-          uri.queryParameters, isLocal, backendCanisterId, idlService);
-
+  Future<void> _manualLogin(Uri uri) async {
+    List<dynamic> result = await AuthLogIn.fetchAgent(
+        uri.queryParameters, isLocal, backendCanisterId, idlService);
+    if (result.isNotEmpty) {
       setState(() {
-        isLoggedIn = status == "true" ? true : false;
-        _principalId = delegationObject[0].toString();
+        isLoggedIn = uri.queryParameters['status'] == "true" ? true : false;
+        _principalId = result[0];
       });
     } else {
-      // Handling URI when app is reloaded or opened directly
-      String? savedUri = prefs.getString('last_uri');
-      if (savedUri == uri) {
-        log('Ignoring last saved URI');
-      } else {
-        // Performing action based on the URI
-        List<Object> validatedDelegation = await AuthLogIn.getDelegations();
-
-        setState(() {
-          isLoggedIn = validatedDelegation.whereType<bool>().first == true
-              ? true
-              : false;
-        });
-        if (isLoggedIn == true) {
-          setState(() {
-            _principalId = validatedDelegation[1].toString();
-          });
-        }
-        prefs.setString('last_uri', uri.toString());
-      }
-      _initialized = true;
+      setState(() {
+        isLoggedIn = false;
+        _principalId = "Log in to see your principal";
+      });
     }
   }
   ```    
@@ -203,13 +169,15 @@ When passing argument in the IIDLogin button, remember to pass your app:host and
 
 #### For login button call:
 
+Replace the argument host and scheme with your app's host and scheme
+
 `AuthLogIn.authenticate(isLocal, middlePageCanisterId,
 "exampleCallback", "example");`
 
 #### For logout button call:
 
 `List<Object> logoutValidation =
-await AuthLogout.logout();`
+await AuthLogout.logout(isLocal, backendCanisterId);`
 
 ## **ℹ️ Additional Info:**
 
@@ -218,7 +186,7 @@ await AuthLogout.logout();`
 #### This package depends on the following dependencies:
 
 * agent_dart: ^1.0.0-dev.22
-* fluttertoast: ^8.2.5
-* uni_links: ^0.5.1
 * flutter_custom_tabs: ^2.0.0+1
-* flutter_secure_storage: ^9.0.0
+* flutter_secure_storage: ^9.2.1
+* shared_preferences: ^2.2.3
+* uni_links: ^0.5.1
