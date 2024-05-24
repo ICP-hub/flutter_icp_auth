@@ -1,6 +1,6 @@
 # flutter_iid_login
 
-A new Flutter project.
+Example project demonstrating flutter and Internet Identity login
 
 ## Getting Started
 

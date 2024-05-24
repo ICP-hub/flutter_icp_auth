@@ -1,20 +1,15 @@
 import 'dart:convert';
 import 'package:agent_dart/agent_dart.dart';
-
-// Class for defining the IDL service for the whoAmI()
-abstract class NewFieldsMethod {
-  static const whoAmI = 'whoami';
-  static final ServiceClass idl = IDL.Service(
-    {
-      NewFieldsMethod.whoAmI: IDL.Func([], [IDL.Text], []),
-    },
-  );
-}
+import '../internal/auth_idl.dart';
 
 class DelegationValidation {
   static HttpAgent? validationAgent;
   static Future<List<Object>> validateDelegation(
-      String pubKey, String privKey, String delegation) async {
+      bool isLocal,
+      String canisterId,
+      String pubKey,
+      String privKey,
+      String delegation) async {
     try {
       // Generating appIdentity using the public and private key
       var keyPairValues = [pubKey, privKey];
@@ -29,24 +24,35 @@ class DelegationValidation {
           DelegationIdentity(newIde, delegationChain);
 
       // Creating HttpAgent using the delegation Identity
-      validationAgent = HttpAgent(
-          options: HttpAgentOptions(
-        identity: delegationIdentity,
-        host: 'icp-api.io',
-      ));
+      validationAgent = isLocal
+          ? HttpAgent(
+              options: HttpAgentOptions(
+                identity: delegationIdentity,
+              ),
+              defaultHost: 'localhost',
+              defaultPort: 4943,
+              defaultProtocol: 'http',
+            )
+          : HttpAgent(
+              options: HttpAgentOptions(
+                identity: delegationIdentity,
+                host: 'icp-api.io',
+              ),
+            );
 
       // Creating a new CanisterActor using the new Agent
       CanisterActor newActor = CanisterActor(
           ActorConfig(
-            canisterId: Principal.fromText('cni7b-uaaaa-aaaag-qc6ra-cai'),
+            canisterId: Principal.fromText(canisterId),
             agent: validationAgent,
           ),
-          NewFieldsMethod.idl);
+          FieldsMethod.idl);
 
       // Calling whoAmI to confirm API call
-      await newActor.getFunc(NewFieldsMethod.whoAmI)?.call([]);
+      var validatedPrincipal =
+          await newActor.getFunc(FieldsMethod.whoAmI)?.call([]);
 
-      return [true, validationAgent!, delegationIdentity];
+      return [true, validatedPrincipal, validationAgent!, delegationIdentity];
     } catch (e) {
       return [false, e];
     }

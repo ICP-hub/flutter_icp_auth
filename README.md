@@ -9,20 +9,78 @@ This Flutter package simplifies integrating ICP internet identity authentication
 * **RELOAD**: Automatically logs in users when the app is reloaded or opened, based on session data/delegationObject.
 * **LOGOUT**: Provides functionality for users to log out.
 
+## **⚠️ Important Info**
+
+#### 1. `isLocal` is used to denote whether you are running your application using mainnet links or locally.
+
+* Change the bool value based on your apps requirement.
+* If `isLocal` is *true* then replace the values of `backendCanisterId` and `middlePageCanisterId` with the locally deployed canister ids.
+* If `isLocal` is *false* then  replace the values of `backendCanisterId` and `middlePageCanisterId` with the main-net deployed canister ids.
+
+#### 2. For local or main-net `backendCanisterId` make sure you have the following function in your backend:
+
+* Rust:
+
+   ```rust
+   use ic_cdk::api::caller;
+   #[ic_cdk::query]
+   fn whoami() -> String {
+       let principal_id = caller().to_string();
+       format!("principal id - : {:?}", principal_id)
+   }
+   ```
+
+* Motoko:
+
+   ```motoko
+   import Principal "mo:base/Principal";
+   actor {
+       public shared (msg) func whoami() : async Text {
+           Principal.toText(msg.caller);
+       };
+   };
+   ```
+
+  For main-net you can use our canisterId as well: `cni7b-uaaaa-aaaag-qc6ra-cai`
+
+#### 3. For local or main-net `middlePageCanisterId` make sure you have the following:
+
+* **Local:**
+
+  Clone the repo from here and deploy locally: https://github.com/SomyaRanjanSahu/flutter_icp_auth_middleware
+
+* **Main-net:**
+
+  a. You can deploy the cloned [middlePage](https://github.com/SomyaRanjanSahu/flutter_icp_auth_middleware) to main net and use the main net canister id.
+
+  OR
+
+  b. You can use our main-net id as well: `nplfj-4yaaa-aaaag-qjucq-cai`
+
+#### 4. For IDL and Services:
+
+* You can use [candid_dart](https://pub.dev/packages/candid_dart) to generate the did files and the IDL services and then use them in the app as demonstrated in the example app.
+
+  OR
+
+* You can add/write the file or code manually and then use them accordingly.
+
 ## **🚀 Getting Started & Usage**
 
 ### **1. Setup**
 
-* **Add the package in *pubspec.yaml*:**
+* **Add these packages in *pubspec.yaml*:**
 
   ```
   dependencies:
     flutter_icp_auth: ^1.0.0
+    agent_dart: ^1.0.0-dev.22
   ```
 
-* **Import the package in you *main.dart*:**
+* **Import the packages in you *main.dart*:**
 
   ``` 
+  import 'package:agent_dart/agent_dart.dart';
   import 'package:flutter_icp_auth/flutter_icp_auth.dart';
   ```
 
@@ -47,114 +105,88 @@ This Flutter package simplifies integrating ICP internet identity authentication
 
   ```
   bool isLocal =
-        false; // To confirm if you running your project locally or using main-net. Change it to true if running locally
-  StreamSubscription? _sub;
-  late List<Object> delegationObject;
-  String canisterId =
-        'cni7b-uaaaa-aaaag-qc6ra-cai'; // Replace it with your backend canister id
+      false; // To confirm if you running your project locally or using main-net. Change it to true if running locally
   Service idlService =
-        FieldsMethod.idl;
+      FieldsMethod.idl; // Idl service (Location: lib/integration.dart)
+  String backendCanisterId =
+      'cni7b-uaaaa-aaaag-qc6ra-cai'; // Replace it with your backend canisterId
+  String middlePageCanisterId =
+      'nplfj-4yaaa-aaaag-qjucq-cai'; // Replace it with your middlePage canisterId
   ```
 
 * **Define the initState and dispose methods:**
 
   ``` 
-  // Add this in the app to check the login state when app is opened
-    @override
-    void initState() {
-      super.initState();
-      _checkIfLoggedIn();
-      if (isLoggedIn == false) {
-        _initUniLinks();
-      }
-    }
-
-    // Add this to cancel the sub and dispose the state
-    @override
-    void dispose() {
-      _sub?.cancel();
-      super.dispose();
-    } 
-  ```
-
-* **Handle incoming deep links:**
-
-  ```
-  Future<void> _initUniLinks() async {
-    Future<void> processUri(Uri? uri) async {
-      if (uri != null) {
-        try {
-          delegationObject =
-              await IIDLoginState.fetchAgent(uri.queryParameters, isLocal);
-          log("Delegation Object: $delegationObject");
-          customLoader.showSuccess("Login Successful");
-          whoAmI();
-        } catch (e) {
-          log("fetchAgent Error: $e");
+  @override
+  void initState() {
+    super.initState();
+    AuthLogIn.checkLoginStatus(isLocal, backendCanisterId).then((loggedIn) {
+      setState(() {
+        isLoggedIn = loggedIn;
+        if (loggedIn) {
+          _principalId = AuthLogIn.getPrincipal;
         }
+      });
+      if (!loggedIn) {
+        UrlListener.handleInitialUri(_fetchAgent, () {});
+        UrlListener.initListener(_fetchAgent);
       }
-    }
-
-    try {
-      final initialLink = await getInitialUri();
-      await processUri(initialLink);
-    } catch (e) {
-      log("initialLink Error: $e");
-    }
-
-    _sub = uriLinkStream.listen(
-      (Uri? uri) async {
-        await processUri(uri);
-      },
-      onError: (err) {
-        log("uriLinkStream Error: $err");
-      },
-    );
+    });
   }
+
+  @override
+  void dispose() {
+    UrlListener.cancelListener();
+    super.dispose();
+  } 
   ```
 
-### **3. Authentication Methods**
+* **Manual login:**
 
-You can customize these functions based on your app functionality and design requirements. But, call the below functions inside the mentioned functions to get the data.
+  `isLoggedIn` and `_principalId` are used to change the state of the log in/log out button and principal text. You can modify them according to your applications need.
 
-* **_checkIfLoggedIn():** Call the `readData()` to get the delegationObject after being validated.
+  ```
+  Future<void> _manualLogin(Uri uri) async {
+    List<dynamic> result = await AuthLogIn.fetchAgent(
+        uri.queryParameters, isLocal, backendCanisterId, idlService);
+    if (result.isNotEmpty) {
+      setState(() {
+        isLoggedIn = uri.queryParameters['status'] == "true" ? true : false;
+        _principalId = result[0];
+      });
+    } else {
+      setState(() {
+        isLoggedIn = false;
+        _principalId = "Log in to see your principal";
+      });
+    }
+  }
+  ```    
 
-    ```
-    delegationObject = await IIDLoginState.readData();
-        isLoggedIn = delegationObject.whereType<bool>().first;
-    ```    
-
-* **whoAmI():** Call the `getActor()`/`getAllActors()` to get the canisterActor created using the `HttpAgent`
-
-    ```
-    CanisterActor newActor = IIDLoginState.getActor(canisterId, idlService);
-    ```    
-
-### **4. Using the IIDLogin Button**
+### **3. Using the IIDLogin Button**
 
 When passing argument in the IIDLogin button, remember to pass your app:host and app:callback:
 
-  ```
-  IIDLogin(
-            text: "Sign In With Internet Identity",
-            isComplete: true,
-            scheme: "example",
-            host: "exampleCallback")
-  ```
+#### For login button call:
+
+Replace the argument host and scheme with your app's host and scheme
+
+`AuthLogIn.authenticate(isLocal, middlePageCanisterId,
+"exampleCallback", "example");`
+
+#### For logout button call:
+
+`List<Object> logoutValidation =
+await AuthLogout.logout(isLocal, backendCanisterId);`
 
 ## **ℹ️ Additional Info:**
 
-#### 📄 Example file location: `example/lib/login.dart`
+#### 📄 Example file location: `example/lib/main.dart`
 
 #### This package depends on the following dependencies:
 
 * agent_dart: ^1.0.0-dev.22
-* fluttertoast: ^8.2.5
-* uni_links: ^0.5.1
 * flutter_custom_tabs: ^2.0.0+1
-* flutter_secure_storage: ^9.0.0
-
-#### Your app should have the following dependencies:
-
+* flutter_secure_storage: ^9.2.1
+* shared_preferences: ^2.2.3
 * uni_links: ^0.5.1
-* agent_dart: ^1.0.0-dev.22
